@@ -1625,7 +1625,8 @@ section[hidden],article[hidden]{display:none!important}
 
     /* Metas */
     if(R.metas.length){
-      var bm=caja(host,'Metas de ahorro','Cada traspaso a Fintual cuenta para la meta cuya palabra aparece en la nota («rio», «pie»); si no tiene ninguna, va a Ahorro general. Avance desde '+nombre(AHORRO_DESDE)+'.');
+      var mdef=R.metas.filter(function(x){ return /general/.test(sinT(x.m.ID+' '+x.m.Nombre)); })[0]||R.metas[0], pals=R.metas.filter(function(x){ return x!==mdef && x.m.Buscar; }).map(function(x){ return '«'+x.m.Buscar+'»'; }).join(', ');
+      var bm=caja(host,'Metas de ahorro','Cada traspaso a Fintual cuenta para la meta cuya palabra aparece en la nota ('+pals+'); si no tiene ninguna, va a '+mdef.m.Nombre+'. Avance desde '+nombre(AHORRO_DESDE)+'.');
       bm.h.appendChild(el('span','n',pesos(R.ahorroHecho)+' de '+pesos(R.ahorroPlan)));
       R.metas.forEach(function(x){
         var m=x.m, r=el('div','pl col'), top=el('div','plt'), obj=num(m.Objetivo);
