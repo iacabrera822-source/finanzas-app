@@ -343,7 +343,7 @@ section[hidden],article[hidden]{display:none!important}
 
   <section id="vcue" hidden>
     <div id="cueLista">
-      <div class="note" id="cueNota">Saldos de la copia guardada del 20 de noviembre.</div>
+      <div class="note" id="cueNota">Saldos de la copia guardada del 22 de noviembre.</div>
       <section class="gsum" id="gsum"></section>
       <div id="grupos"></div>
     </div>
@@ -566,7 +566,7 @@ section[hidden],article[hidden]{display:none!important}
     fetch('datos.json').then(function(r){return r.json();}).then(function(d){
       if(modo==='vivo') return;
       modo='copia'; cargar(d.map(desdeCopia),'');
-      if($('eMsg').textContent.indexOf('Conectando')===0) estado('','Sin conexión en vivo: muestro la copia guardada del 20 de noviembre.',MCP?BTN_ACT:null);
+      if($('eMsg').textContent.indexOf('Conectando')===0) estado('','Sin conexión en vivo: muestro la copia guardada del 22 de noviembre.',MCP?BTN_ACT:null);
     }).catch(function(){ $('cargando').textContent='No se pudieron cargar los datos. Vuelve a abrir la página.'; });
   }
 
@@ -655,10 +655,10 @@ section[hidden],article[hidden]{display:none!important}
   }
   else if(C && typeof C.use==='function'){
     C.use('mcp').then(function(m){
-      if(!m){ estado('','Sin conexión en vivo aquí: muestro la copia guardada del 20 de noviembre.',null); usarCopia(); return; }
+      if(!m){ estado('','Sin conexión en vivo aquí: muestro la copia guardada del 22 de noviembre.',null); usarCopia(); return; }
       iniciar(m);
     },function(){ usarCopia(); });
-  } else { estado('','Sin conexión en vivo aquí: muestro la copia guardada del 20 de noviembre.',null); usarCopia(); }
+  } else { estado('','Sin conexión en vivo aquí: muestro la copia guardada del 22 de noviembre.',null); usarCopia(); }
 
   /* ---------- Rango de Estadísticas ---------- */
   function mesesEntre(a,b){ var r=[], y=+a.slice(0,4), m=+a.slice(5,7); while(true){ var k=y+'-'+('0'+m).slice(-2); if(k>b) break; r.push(k); m++; if(m>12){m=1;y++;} if(r.length>600) break; } return r; }
@@ -1010,7 +1010,7 @@ section[hidden],article[hidden]{display:none!important}
     if(CU.sel){ dCueDet(); return; }
     var nota=$('cueNota');
     if(fuenteSal==='vivo'){ nota.className='info'; nota.textContent='Saldo de hoy = saldo inicial de la hoja «Cuentas» + movimientos posteriores (las cuotas futuras no cuentan). Toca una cuenta para ver sus movimientos.'; }
-    else { nota.className='note'; nota.textContent='Saldos de la copia guardada del 20 de noviembre (no pude leer la hoja «Cuentas»). Toca una cuenta para ver sus movimientos.'; }
+    else { nota.className='note'; nota.textContent='Saldos de la copia guardada del 22 de noviembre (no pude leer la hoja «Cuentas»). Toca una cuenta para ver sus movimientos.'; }
     var cap=0, deu=0;
     SAL.forEach(function(a){ if(!enTotal(a)) return; if(a.s<0) deu+=-a.s; else cap+=a.s; });
     $('gsum').innerHTML='';
@@ -1093,7 +1093,7 @@ section[hidden],article[hidden]{display:none!important}
     var hd=el('div','dhead'), bv=el('button','btn','←'); bv.setAttribute('aria-label','Volver a Cuentas');
     bv.addEventListener('click',function(){ CU.sel=null; dibujar(); });
     hd.appendChild(bv); hd.appendChild(el('h2',null,acc)); host.appendChild(hd);
-    if(inf.s!=null){ var cuando=inf.f0?'hoy':'copia 20 nov', sd=el('div','dtot',enMon(inf.s,mon)); sd.appendChild(el('small',null,(tarj?(inf.s<0?'por pagar':'a favor'):'saldo')+' · '+cuando)); host.appendChild(sd); }
+    if(inf.s!=null){ var cuando=inf.f0?'hoy':'copia 22 nov', sd=el('div','dtot',enMon(inf.s,mon)); sd.appendChild(el('small',null,(tarj?(inf.s<0?'por pagar':'a favor'):'saldo')+' · '+cuando)); host.appendChild(sd); }
     if(ESCRIBE && tarj && mon==='CLP' && inf.s<0){
       var bp=el('button','btn pri','Pagar tarjeta'); bp.style.cssText='width:100%;margin:4px 0 10px;padding:10px';
       bp.addEventListener('click',function(){ abrirMov({titulo:'Pagar '+acc, ayuda:'Revisa el monto: parte con todo lo que debes hoy (sin cuotas futuras). Si el bot ya registró este pago desde el correo, no lo agregues de nuevo.',
