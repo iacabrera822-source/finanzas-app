@@ -206,6 +206,12 @@ html.app .fab.on{display:block}
 .creal.big input{font-family:var(--font-num);font-size:24px;padding:10px 12px}
 .creal select{font-size:16px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
 .creal input.otra{margin-top:4px}
+.ayudac{font-size:12px;color:var(--muted)}
+.parte{border:1px solid var(--line);border-radius:10px;padding:4px 10px 8px;margin:8px 0}
+.phd{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+.phd .btn{padding:3px 10px;font-size:12.5px}
+.falta{font-size:14px;margin:6px 0;color:var(--gasto);font-weight:600}
+.falta.ok{color:var(--ingreso)}
 .tokbox{max-width:420px;margin:30px auto;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
 .tokbox h2{margin:0 0 8px;font-size:18px}
 .tokbox p{color:var(--muted);font-size:14px;margin:0 0 12px}
@@ -279,6 +285,7 @@ html.app .fab.on{display:block}
         <button data-t="todo" aria-pressed="true">Todo</button><button data-t="I" aria-pressed="false">Ingresos</button><button data-t="G" aria-pressed="false">Gastos</button>
       </div>
       <select id="cta" aria-label="Filtrar por cuenta"><option value="">Todas las cuentas</option></select>
+      <select id="fte" aria-label="Filtrar por origen"><option value="">Cualquier origen</option></select>
       <label><input type="checkbox" id="vtr" checked> Traspasos</label>
       </div>
       <label id="lglob" hidden><input type="checkbox" id="glob" checked> Buscar en todos los meses</label>
@@ -330,6 +337,8 @@ html.app .fab.on{display:block}
     <p id="penRes" style="margin:16px 0 6px"></p>
     <div class="note" id="penNota">Por ahora solo se ven aquí. Para confirmarlos o corregirlos, abre la app (el ícono en tu celular).</div>
     <div id="penDias"></div>
+    <div id="penDeben"></div>
+    <div id="penHist"></div>
   </section>
 
   <p class="foot">Los traspasos entre tus cuentas no suman a ingresos ni gastos. Un traspaso a Fintual cuenta como gasto en Inversiones y uno desde Fintual como ingreso. Un gasto negativo es un reembolso o un pago que te hicieron. Toca cualquier movimiento para ver su ficha completa.</p>
@@ -436,10 +445,15 @@ html.app .fab.on{display:block}
   var _meses=null;
   function mesesData(){ if(_meses) return _meses; var s={}; ALL.forEach(function(o){ s[o.k]=1; }); _meses=Object.keys(s).sort(); return _meses; }
   function claves(){ return mesesData().slice().reverse(); }
+  function fuenteDe(o){ var f=o.m.fuente||''; if(!f) return 'Money Manager (antiguo)'; if(/^correo/i.test(f)) return 'Correo'; if(/telegram/i.test(f)) return 'Telegram'; if(/cuota/i.test(f)) return 'Cuota programada'; if(/panel/i.test(f)) return 'Panel'; return f; }
 
   function cargar(movs, avisos){
     ALL=movs.map(clasificar).sort(function(a,b){ return a.fecha<b.fecha?1:a.fecha>b.fecha?-1:0; });
     _meses=null;
+    var fs={}; ALL.forEach(function(o){ fs[fuenteDe(o)]=(fs[fuenteDe(o)]||0)+1; });
+    var sf=$('fte'), pf=sf.value; sf.length=1;
+    Object.keys(fs).sort(function(a,b){ return fs[b]-fs[a]; }).forEach(function(f){ var op=document.createElement('option'); op.value=f; op.textContent=f+' ('+fs[f].toLocaleString('es-CL')+')'; sf.appendChild(op); });
+    sf.value=pf;
     var cs={}; ALL.forEach(function(o){ if(o.cuenta) cs[o.cuenta]=1; });
     var sel=$('cta'), prev=sel.value; sel.length=1;
     Object.keys(cs).sort().forEach(function(c){ var op=document.createElement('option'); op.value=c; op.textContent=c; sel.appendChild(op); });
@@ -675,7 +689,7 @@ html.app .fab.on{display:block}
     $('navbar').hidden=!(vista==='det'&&!glob || vista==='est');
     $('filtros').hidden=vista!=='det';
     $('fab').classList.toggle('on',vista==='det'||vista==='pen');
-    var nf=(tipoDet!=='todo'?1:0)+($('cta').value?1:0)+($('vtr').checked?0:1); $('fBtn').textContent=nf?'Filtros ('+nf+')':'Filtros'; $('fBtn').classList.toggle('act',!!nf);
+    var nf=(tipoDet!=='todo'?1:0)+($('cta').value?1:0)+($('fte').value?1:0)+($('vtr').checked?0:1); $('fBtn').textContent=nf?'Filtros ('+nf+')':'Filtros'; $('fBtn').classList.toggle('act',!!nf);
     $('estRango').hidden=vista!=='est';
     $('lglob').hidden=!(vista==='det' && $('q').value.trim()!=='');
     try{ history.replaceState(null,'','#'+vista+'/'+clave); }catch(e){}
@@ -757,11 +771,12 @@ html.app .fab.on{display:block}
 
   /* ---------- Movimientos ---------- */
   function dDetalle(){
-    var q=$('q').value.trim().toLowerCase(), cta=$('cta').value, vtr=$('vtr').checked, glob=busquedaGlobal();
+    var q=$('q').value.trim().toLowerCase(), cta=$('cta').value, fte=$('fte').value, vtr=$('vtr').checked, glob=busquedaGlobal();
     var base=glob?ALL:ALL.filter(function(o){ return o.k===clave; });
     var filas=base.filter(function(o){
       if(tipoDet!=='todo' && o.tipo!==tipoDet) return false;
       if(cta && o.cuenta!==cta && o.destino!==cta) return false;
+      if(fte && fuenteDe(o)!==fte) return false;
       if(!vtr && o.tipo==='T') return false;
       if(q){ var s=(o.cat+' '+o.sub+' '+o.nota+' '+o.m.desc+' '+o.cuenta+' '+(o.destino||'')).toLowerCase(); if(s.indexOf(q)<0) return false; }
       return true; });
@@ -1012,6 +1027,11 @@ html.app .fab.on{display:block}
     bv.addEventListener('click',function(){ CU.sel=null; dibujar(); });
     hd.appendChild(bv); hd.appendChild(el('h2',null,acc)); host.appendChild(hd);
     if(inf.s!=null){ var cuando=inf.f0?'hoy':'copia 20 nov', sd=el('div','dtot',enMon(inf.s,mon)); sd.appendChild(el('small',null,(tarj?(inf.s<0?'por pagar':'a favor'):'saldo')+' · '+cuando)); host.appendChild(sd); }
+    if(ESCRIBE && tarj && mon==='CLP' && inf.s<0){
+      var bp=el('button','btn pri','Pagar tarjeta'); bp.style.cssText='width:100%;margin:4px 0 10px;padding:10px';
+      bp.addEventListener('click',function(){ abrirMov({titulo:'Pagar '+acc, ayuda:'Revisa el monto: parte con todo lo que debes hoy (sin cuotas futuras). Si el bot ya registró este pago desde el correo, no lo agregues de nuevo.',
+        m:{tipoRaw:'T', cuenta:inf.pago||'Linea de crédito BCI', cat:acc, sub:'', nota:'Pago tarjeta '+acc, clp:Math.round(-inf.s), moneda:'CLP', desc:''}},'prefill'); });
+      host.appendChild(bp); }
 
     var seg=el('div','seg full'); seg.setAttribute('role','group'); seg.setAttribute('aria-label','Vista');
     [['m','Mensual'],['a','Anual']].forEach(function(x){ var b=el('button',null,x[1]); b.setAttribute('aria-pressed',CU.modo===x[0]);
@@ -1820,7 +1840,8 @@ html.app .fab.on{display:block}
     var l=ALL.filter(function(o){ return o.pendEst||o.rev; });
     var np=l.filter(function(o){return o.pendEst;}).length, nr=l.filter(function(o){return o.rev;}).length;
     $('penRes').textContent=l.length?(l.length+' movimiento'+(l.length>1?'s':'')+' por revisar: '+np+' pendiente'+(np===1?'':'s')+' de confirmar y '+nr+' marcado'+(nr===1?'':'s')+' «Revisar».'):'No tienes movimientos pendientes ni por revisar. 🎉';
-    pintarDias($('penDias'),l,true,LIM);
+    $('penDias').hidden=$('penNota').hidden=!l.length; if(l.length) pintarDias($('penDias'),l,true,LIM);
+    dDeben(); dHist();
     var pn=$('penNota'); if(ESCRIBE && listo){
       pn.textContent='Toca uno para corregirlo: al guardar queda confirmado. Si todos están bien, confírmalos de una vez. ';
       var ids=l.filter(function(o){ return o.m.id; }).map(function(o){ return o.m.id; });
@@ -1862,14 +1883,14 @@ html.app .fab.on{display:block}
   /* modo: 'nuevo' | 'editar' | 'copiar' */
   function abrirMov(o,modo){
     modo=modo||'nuevo'; var m=o?o.m:null, ed=modo==='editar';
-    var box=hojaBase(ed?'Editar movimiento':modo==='copiar'?'Copiar movimiento':'Nuevo movimiento', ed?'Los cambios quedan respaldados y puedes deshacerlos.':'Se agrega a «Movimientos» como confirmado.');
+    var box=hojaBase(ed?'Editar movimiento':modo==='copiar'?'Copiar movimiento':(o&&o.titulo)||'Nuevo movimiento', (o&&o.ayuda)?o.ayuda:ed?'Los cambios quedan respaldados y puedes deshacerlos.':'Se agrega a «Movimientos» como confirmado.');
     var T=m?m.tipoRaw:'G';
     var seg=el('div','seg mseg'); seg.setAttribute('role','group'); seg.setAttribute('aria-label','Tipo');
     [['G','Gasto'],['I','Ingreso'],['T','Traspaso']].forEach(function(x){ var b=el('button',null,x[1]); b.dataset.t=x[0]; b.type='button'; seg.appendChild(b); });
     box.appendChild(seg);
     var extranjera=m && m.moneda && m.moneda!=='CLP';
     var dos=el('div','dos'); box.appendChild(dos);
-    var fec=campo(dos,'Fecha','date',(modo==='copiar'||!m)?FHOY:m.fecha);
+    var fec=campo(dos,'Fecha','date',(modo!=='editar'||!m)?FHOY:m.fecha);
     var cta=campo(dos,'Cuenta','select'); var ctaW=cta.parentNode;
     var cuentas=cuentasMov();
     selConOtra(cta,cuentas,m?m.cuenta:(cuentas[0]||''));
@@ -1882,7 +1903,10 @@ html.app .fab.on{display:block}
     mw.appendChild(mon); box.appendChild(mw);
     mon.addEventListener('input',function(){ var d=mon.value.replace(/[^\d]/g,''); mon.value=d?fmt.format(+d):''; });
     var rw=el('label','creal chk'), reemb=document.createElement('input'); reemb.type='checkbox'; rw.appendChild(reemb); rw.appendChild(el('span',null,'Es un reembolso o me devolvieron plata (resta al gasto)')); box.appendChild(rw);
-    if(m && m.clp<0) reemb.checked=true;
+    if((m && m.clp<0) || (o && o.reemb)) reemb.checked=true;
+    var cuo=null;
+    if(!ed){ cuo=opciones(campo(box,'¿En cuotas?','select'),[['1','No, un solo pago']].concat([2,3,4,5,6,7,8,9,10,11,12,15,18,24,36,48].map(function(n){ return [String(n),n+' cuotas']; })),'1');
+      cuo.parentNode.appendChild(el('span','ayudac','Se crea una fila por cuota: la primera en la fecha elegida y las demás un mes después cada una.')); }
     var dst=campo(box,'Hacia la cuenta','select');
     var cat=campo(box,'Categoría','select'), sub=campo(box,'Subcategoría','select');
     var tocado={cat:!!m, cta:!!m};
@@ -1892,6 +1916,7 @@ html.app .fab.on{display:block}
       Array.prototype.forEach.call(seg.children,function(b){ b.setAttribute('aria-pressed',b.dataset.t===T); });
       var tr=T==='T';
       rw.hidden=T!=='G'; if(T!=='G') reemb.checked=false;
+      if(cuo){ cuo.parentNode.hidden=T!=='G'; if(T!=='G') cuo.value='1'; }
       ctaW.firstChild.textContent=tr?'Desde la cuenta':'Cuenta';
       dst.parentNode.hidden=!tr; cat.parentNode.hidden=tr; sub.parentNode.hidden=tr;
       if(tr) selConOtra(dst,cuentas,keep&&m&&m.tipoRaw==='T'?m.cat:'','(elige la cuenta)');
@@ -1959,7 +1984,7 @@ html.app .fab.on{display:block}
       v[0]=fec.value; v[1]=vCta; v[2]=T==='T'?vDst:vCat; v[3]=T==='T'?'':vSub; v[4]=nota.value.trim();
       v[5]=clp; v[6]=T==='G'?'Gasto':T==='I'?'Ingreso':'Dinero gastado';
       if(!extranjera && (!ed || num(m.raw[5])!==+clp)){ v[8]=clp; v[9]='CLP'; v[15]=''; }
-      if(!ed){ v[7]=modo==='copiar'?m.desc:''; v[10]=''; v[11]=''; v[13]=''; v[14]=''; }
+      if(!ed){ v[7]=(modo==='copiar'&&m.desc)?m.desc:''; v[10]=''; v[11]=''; v[13]=''; v[14]=''; }
       v[12]=''; v[16]='Confirmado'; if(ed) v[11]='';
       var desc=(T==='T'?'Traspaso '+v[1]+' → '+v[2]:v[2]+(v[3]?' · '+v[3]:''))+' '+pesos(+clp||0);
       var lin=[(T==='G'?'Gasto':T==='I'?'Ingreso':'Traspaso')+': '+(extranjera?enMon(m.importe||0,m.moneda):pesos(+clp)), fechaCorta(v[0])+' · '+v[1]+(T==='T'?' → '+v[2]:''), T==='T'?'':('Categoría: '+v[2]+(v[3]?' · '+v[3]:'')), 'Nota: '+(v[4]||'(sin nota)')].filter(Boolean);
@@ -1969,11 +1994,77 @@ html.app .fab.on{display:block}
         lin=dif.length?dif:['Sin cambios en los datos.']; if(o.pendEst||o.rev) lin.push('Queda confirmado (sale de Pendientes).');
         confirmarCambio('Guardar cambios',lin,function(){ return guardarMov('editar',{id:m.id,antes:m.raw,despues:v},'edición de '+desc); },PIE_MOV);
       } else {
+        var nc=cuo?+cuo.value:1;
+        if(nc>1){
+          if(reemb.checked){ aviso('Un reembolso no va en cuotas.'); return; }
+          var filas=[], base=Math.floor(monto/nc), y=+v[0].slice(0,4), mo=+v[0].slice(5,7), dd=+v[0].slice(8,10), nb=v[4]||v[2];
+          for(var k=0;k<nc;k++){ var yy=y+Math.floor((mo-1+k)/12), mm=(mo-1+k)%12+1, dia=Math.min(dd,dim(yy,mm));
+            var mk=k===nc-1?monto-base*(nc-1):base, f=v.slice();
+            f[0]=yy+'-'+('0'+mm).slice(-2)+'-'+('0'+dia).slice(-2); f[4]=nb+'('+(k+1)+'/'+nc+') cuota programada'; f[5]=f[8]=String(mk); f[10]='Cuota programada'; filas.push(f); }
+          lin=['Compra de '+pesos(monto)+' en '+nc+' cuotas de '+pesos(base)+(monto-base*nc?(' (la última de '+pesos(monto-base*(nc-1))+')'):''), 'Desde '+fechaCorta(filas[0][0])+' hasta '+fechaCorta(filas[nc-1][0])+' · '+v[1], 'Categoría: '+v[2]+(v[3]?' · '+v[3]:''), 'Nota de cada cuota: «'+filas[0][4]+'»…'];
+          confirmarCambio('Agregar compra en cuotas',lin,function(){ return guardarMov('agregar',{filas:filas},nc+' cuotas de '+nb+' agregadas'); },PIE_MOV);
+          return;
+        }
         confirmarCambio(modo==='copiar'?'Agregar copia':'Agregar movimiento',lin,function(){ return guardarMov('agregar',{filas:[v]},desc+' agregado'); },PIE_MOV);
       }
     }]]);
     var acc=box.lastChild; acc.lastChild.classList.add('pri');
     if(!m) setTimeout(function(){ nota.focus(); },50);
+  }
+  /* Dividir: la suma de las partes debe dar el cobro del banco (PanelApi → lógica del bot) */
+  function abrirDividir(o){
+    var m=o.m, total=Math.round(m.clp), signo=total<0?-1:1, T=m.tipoRaw, CAT=catalogo(T), cats=ordenar(CAT,function(x){return x.n;});
+    var box=hojaBase('Dividir · '+pesos(Math.abs(total)), (m.nota||titulo(o))+' · '+fechaCorta(o.fecha)+' · '+m.cuenta);
+    var lista=el('div','partes'); box.appendChild(lista);
+    var falta=el('div','falta'); box.appendChild(falta);
+    var add=el('button','btn','+ Agregar parte'); add.type='button'; add.style.cssText='width:100%;margin:6px 0 4px'; box.appendChild(add);
+    var CQD=cats.filter(function(c){ return /quedan debiendo/i.test(c); })[0]||'';
+    var otros=null; if(T==='G' && CQD){ otros=el('button','btn','+ Parte que pagué por otros (me la deben)'); otros.type='button'; otros.style.cssText='width:100%;margin:0 0 4px'; box.appendChild(otros); }
+    var P=[];
+    function sumaOtras(x){ return P.reduce(function(a,q){ return q===x?a:a+(+(q.mon.value.replace(/[^\d]/g,''))||0); },0); }
+    function actualizar(){
+      var s=P.reduce(function(a,q){ return a+(+(q.mon.value.replace(/[^\d]/g,''))||0); },0), d=Math.abs(total)-s;
+      falta.textContent=d===0?'✓ Las partes suman '+pesos(Math.abs(total))+'.':(d>0?'Falta asignar '+pesos(d)+'.':'Te pasaste por '+pesos(-d)+'.');
+      falta.className='falta'+(d===0?' ok':'');
+      P.forEach(function(q,i){ q.h.textContent='Parte '+(i+1); q.x.hidden=P.length<=2; });
+      return d;
+    }
+    function parte(cat0,sub0,nota0,monto0){
+      var w=el('div','parte'), hd=el('div','phd'), h=el('b',null,''), x=el('button','btn','Quitar'); x.type='button';
+      hd.appendChild(h); hd.appendChild(x); w.appendChild(hd);
+      var mon=campo(w,'Monto','text',monto0?fmt.format(monto0):''); mon.inputMode='numeric'; mon.parentNode.classList.add('big');
+      var cat=campo(w,'Categoría','select'), sub=campo(w,'Subcategoría','select'), nota=campo(w,'Nota','text',nota0||'','Qué es esta parte');
+      selConOtra(cat,cats,cat0||'','(elige la categoría)');
+      function subs(v){ var c=CAT[cat.value]; selConOtra(sub,c?ordenar(c.subs,function(n){return n;}):[],v||'','(sin subcategoría)'); }
+      subs(sub0);
+      function otra(sel,etq){ var ww=sel.parentNode, i=ww.querySelector('input.otra'); if(sel.value!=='__otra'){ if(i) i.hidden=true; return; } if(!i){ i=document.createElement('input'); i.type='text'; i.className='otra'; ww.appendChild(i); } i.placeholder=etq; i.hidden=false; i.value=''; i.focus(); }
+      cat.addEventListener('change',function(){ otra(cat,'Nombre de la categoría nueva'); subs(''); });
+      sub.addEventListener('change',function(){ otra(sub,'Nombre de la subcategoría nueva'); });
+      mon.addEventListener('input',function(){ var d=mon.value.replace(/[^\d]/g,''); mon.value=d?fmt.format(+d):''; actualizar(); });
+      var q={w:w,h:h,x:x,mon:mon,cat:cat,sub:sub,nota:nota};
+      x.addEventListener('click',function(){ P.splice(P.indexOf(q),1); lista.removeChild(w); actualizar(); });
+      P.push(q); lista.appendChild(w); return q;
+    }
+    function val(sel){ if(sel.value!=='__otra') return sel.value; var i=sel.parentNode.querySelector('input.otra'); return i?i.value.trim():''; }
+    parte(m.cat,m.sub,m.nota,null); parte('','','',null);
+    P[0].mon.addEventListener('focus',function(){ if(!P[0].mon.value){ var r=Math.abs(total)-sumaOtras(P[0]); if(r>0) P[0].mon.value=fmt.format(r); actualizar(); } });
+    if(otros) otros.addEventListener('click',function(){
+      var vacia=P.filter(function(q){ return !q.cat.value && !q.mon.value; })[0], q=vacia||parte('','','',null);
+      selConOtra(q.cat,cats,CQD,'(elige la categoría)'); q.cat.dispatchEvent(new Event('change'));
+      q.nota.value=q.nota.value||'Pagué por otros: '; actualizar(); q.mon.focus(); });
+    add.addEventListener('click',function(){ var q=parte('','','',null); var r=Math.abs(total)-sumaOtras(q); if(r>0){ q.mon.value=fmt.format(r); } actualizar(); q.cat.focus(); });
+    actualizar();
+    botones(box,[['Cancelar',cerrarFicha],['Revisar división',function(){
+      if(actualizar()!==0){ aviso(falta.textContent); return; }
+      var partes=[], mal='';
+      P.forEach(function(q,i){ var mo=+(q.mon.value.replace(/[^\d]/g,''))||0, c=val(q.cat); if(!mo) mal='La parte '+(i+1)+' no tiene monto.'; else if(!c) mal='Elige la categoría de la parte '+(i+1)+'.';
+        partes.push({categoria:c, sub:val(q.sub), nota:q.nota.value.trim(), monto:signo*mo}); });
+      if(mal){ aviso(mal); return; }
+      confirmarCambio('Dividir en '+partes.length+' partes', partes.map(function(p,i){ return (i+1)+'. '+pesos(Math.abs(p.monto))+' · '+p.categoria+(p.sub?' · '+p.sub:'')+(p.nota?' — '+p.nota:''); }).concat(['Total: '+pesos(Math.abs(total))+' (igual al cobro del banco)']),
+        function(){ return guardarMov('dividir',{id:m.id,antes:m.raw,partes:partes},'división de '+(m.nota||titulo(o))); },
+        'Se divide igual que lo hace el bot (filas con el mismo ID y «compra dividida k/n»). Queda respaldo en «Cambios» y puedes deshacerlo.');
+    }]]);
+    box.lastChild.lastChild.classList.add('pri');
   }
   function borrarMov(o){
     var m=o.m, mt=montoTxt(o);
@@ -1982,6 +2073,60 @@ html.app .fab.on{display:block}
       'Se quita de «Movimientos». Queda una copia en «Cambios» y puedes deshacerlo.');
   }
   $('fab').addEventListener('click',function(){ abrirMov(null,'nuevo'); });
+
+  /* ---------- Me quedan debiendo ---------- */
+  var DEB_MESES=3;
+  function deudores(){
+    var cq=null, P={}, desde=sumarMeses(KHOY,-(DEB_MESES-1)), pag=0, dev=0;
+    ALL.forEach(function(o){ if(o.m.tipoRaw!=='G' || !/quedan debiendo/i.test(o.m.cat) || o.pend || o.fecha>FHOY) return; cq=o.m.cat; if(o.k<desde) return;
+      if(o.monto>0) pag+=o.monto; else dev+=-o.monto;
+      var k=o.m.sub||'(sin nombre)', x=P[k]=P[k]||{n:k,s:0,l:[]}; x.s+=o.monto; x.l.push(o); });
+    return {cat:cq, desde:desde, pag:pag, dev:dev, lista:Object.keys(P).map(function(k){ return P[k]; }).sort(function(a,b){ return b.s-a.s; })};
+  }
+  function dDeben(){
+    var host=$('penDeben'); host.innerHTML=''; var D=deudores(); if(!D.cat) return;
+    var c=caja(host,'Me quedan debiendo','Desde '+nombre(D.desde)+' (últimos '+DEB_MESES+' meses), agrupado por la subcategoría que usaste. Toca una para ver el detalle'+(ESCRIBE?' o registrar un pago.':'.'));
+    var sel=el('div','seg'); sel.style.margin='0 0 8px'; [[3,'3 meses'],[6,'6 meses'],[12,'12 meses']].forEach(function(x){ var b=el('button',null,x[1]); b.setAttribute('aria-pressed',DEB_MESES===x[0]); b.addEventListener('click',function(){ DEB_MESES=x[0]; dDeben(); }); sel.appendChild(b); }); c.c.appendChild(sel);
+    linea(c.c,'Pagaste por otros',D.pag,''); linea(c.c,'Te devolvieron',D.dev,'i','','-');
+    var tot=0;
+    D.lista.forEach(function(x){ tot+=x.s;
+      var r=filaLinea(x.n,x.s,x.s>0?'':'i',x.s>0?'te debe':'a su favor',x.s>0?'':'+'); r.classList.add('rowc'); r.tabIndex=0; r.setAttribute('role','button');
+      r.addEventListener('click',function(){ abrirDeudor(x,D.cat); }); c.c.appendChild(r); });
+    var lt=linea(c.c,tot>=0?'Te deben en total':'Te devolvieron de más',tot,''); lt.style.fontWeight='600';
+    if(ESCRIBE){ var bg=el('button','btn','Registrar pago recibido'); bg.style.cssText='width:100%;margin-top:8px'; bg.addEventListener('click',function(){ abrirDeudor({n:'',s:0,l:[]},D.cat,true); }); c.c.appendChild(bg); }
+  }
+  function abrirDeudor(x,cat,directo){
+    if(directo){ abrirMov({reemb:true, titulo:'Pago recibido', ayuda:'Queda como gasto negativo en «'+cat+'». Elige la subcategoría (persona) si corresponde.', m:{tipoRaw:'G', cuenta:'Linea de crédito BCI', cat:cat, sub:'', nota:'', clp:null, moneda:'CLP', desc:''}},'prefill'); return; }
+    var box=hojaBase(x.n,(x.s>0?'Te debe '+pesos(x.s):'Saldo a su favor '+pesos(-x.s))+' · últimos '+DEB_MESES+' meses');
+    if(ESCRIBE && x.s>0){ var b=el('button','btn pri','Registrar pago recibido'); b.style.cssText='width:100%;margin:8px 0;padding:10px';
+      b.addEventListener('click',function(){ abrirMov({titulo:'Pago recibido de '+x.n, ayuda:'Queda como gasto negativo en «'+cat+'» (así baja lo que te debe). Ajusta el monto si te pagó solo una parte.',
+        m:{tipoRaw:'G', cuenta:'Linea de crédito BCI', cat:cat, sub:x.n==='(sin nombre)'?'':x.n, nota:'Pago de '+x.n, clp:-Math.round(x.s), moneda:'CLP', desc:''}},'prefill'); });
+      box.appendChild(b); }
+    var l=el('div','lcard'); x.l.slice(0,40).forEach(function(o){ var r=filaLinea(o.nota||'(sin nota)',o.monto,o.monto<0?'i':'',fechaCorta(o.fecha)+' · '+o.cuenta+(o.monto<0?' · te pagó':' · pagaste tú'),o.monto<0?'+':''); l.appendChild(r); });
+    box.appendChild(l);
+    if(x.l.length>40) box.appendChild(el('div','pie2','Muestro los 40 más recientes de '+x.l.length+'.'));
+  }
+  /* ---------- Historial de cambios (hoja «Cambios») ---------- */
+  var HIST=null;
+  function resumenCambio(r){
+    var acc=String(r[2]||''), j=null; try{ j=JSON.parse(r[5]&&r[5]!=='null'?r[5]:r[4]); }catch(e){}
+    var qu='';
+    if(Array.isArray(j) && j.length>=17) qu=(j[2]||'')+(j[4]?' · '+j[4]:'')+(j[5]!==''&&j[5]!=null?' · '+pesos(+j[5]||0):'');
+    else if(Array.isArray(j)) qu=String(r[3]||'').split(':')[0]+': '+(j[3]||j[0]||'');
+    else if(j && j.ids) qu=j.ids.length+' movimiento'+(j.ids.length>1?'s':'');
+    var nom={agregar:'Agregado',cambiar:'Editado',borrar:'Borrado',dividir:'Dividido',aux:'Plan/hojas'}[acc]||acc;
+    return {t:nom+(qu?': '+qu:''), f:String(r[0]||''), d:String(r[6]||'')==='sí'};
+  }
+  function dHist(){
+    var host=$('penHist'); host.innerHTML='';
+    var c=caja(host,'Últimos cambios','Lo que se cambió desde el panel o el bot (hoja «Cambios»). Los deshechos aparecen tachados.');
+    if(!HIST){ var b=el('button','btn','Ver los últimos cambios'); c.c.appendChild(b);
+      b.addEventListener('click',function(){ b.disabled=true; b.textContent='Cargando…';
+        llamar('get_values',{spreadsheetId:INPUT.spreadsheetId, range:'Cambios!A1:G'}).then(function(p){ HIST=((p&&p.values)||[]).slice(1).reverse().slice(0,25); dHist(); },function(e){ b.disabled=false; b.textContent='No se pudo cargar: '+(e.message||e); }); });
+      return; }
+    if(!HIST.length){ c.c.appendChild(el('div','ayuda','Todavía no hay cambios registrados.')); return; }
+    HIST.forEach(function(r){ var x=resumenCambio(r), f=el('div','pl'), a=el('span',null,x.t); a.appendChild(el('small',null,x.f+(x.d?' · deshecho':''))); f.appendChild(a); if(x.d) a.style.textDecoration='line-through'; c.c.appendChild(f); });
+  }
 
   /* ---------- Ficha de un movimiento ---------- */
   var antesFicha=null;
@@ -2001,13 +2146,13 @@ html.app .fab.on{display:block}
     COLS.forEach(function(c,i){ var v=(m.raw&&m.raw[i]!=null)?String(m.raw[i]):''; dl.appendChild(el('dt',null,c)); dl.appendChild(el('dd',v===''?'vac':null,v===''?'—':v)); });
     box.appendChild(dl);
     var acc=el('div','acc'), puede=ESCRIBE && !m.copia;
-    [['Editar',function(){ abrirMov(o,'editar'); }],['Dividir',null],['Copiar',function(){ abrirMov(o,'copiar'); }],['Borrar',function(){ borrarMov(o); }]].forEach(function(x){
+    [['Editar',function(){ abrirMov(o,'editar'); }],['Dividir',(o.m.tipoRaw!=='T' && (o.m.moneda||'CLP')==='CLP' && o.m.clp)?function(){ abrirDividir(o); }:null],['Copiar',function(){ abrirMov(o,'copiar'); }],['Borrar',function(){ borrarMov(o); }]].forEach(function(x){
       var b=el('button','btn',x[0]); b.disabled=!puede||!x[1]; if(x[1]) b.addEventListener('click',x[1]); acc.appendChild(b); });
     box.appendChild(acc);
     if(puede && (o.pendEst||o.rev) && m.id){ var bc=el('button','btn pri','✓ Está bien, confirmar'); bc.style.cssText='width:100%;margin:10px 0 0;padding:11px;font-size:15px';
       bc.addEventListener('click',function(){ bc.disabled=true; bc.textContent='Confirmando…'; guardarMov('confirmar',{ids:[m.id]},titulo(o)+' confirmado').then(function(){ cerrarFicha(); aviso('Confirmado: '+titulo(o),true); },function(e){ bc.disabled=false; bc.textContent='✓ Está bien, confirmar'; aviso('No se pudo confirmar: '+(e.message||e)); }); });
       box.insertBefore(bc,dl); }
-    box.appendChild(el('div','pie2',puede?'Dividir llega en el próximo paso.':'Editar, copiar y borrar movimientos se hace desde la app (el ícono en tu celular).'));
+    box.appendChild(el('div','pie2',puede?((o.m.tipoRaw==='T'||(o.m.moneda||'CLP')!=='CLP')?'Los traspasos y los movimientos en otra moneda no se dividen.':'Dividir separa este cobro en varias categorías; la suma debe dar el total.'):'Editar, copiar y borrar movimientos se hace desde la app (el ícono en tu celular).'));
     f.appendChild(box); f.hidden=false; document.body.style.overflow='hidden';
     cerrar.focus();
   }
@@ -2034,7 +2179,7 @@ html.app .fab.on{display:block}
   $('estSeg').addEventListener('click',function(e){ var t=e.target.dataset.t; if(!t) return; tipoEst=t; dibujar(); });
   $('volver').addEventListener('click',function(){ estCat=null; estSub=null; dibujar(); });
   var tq=null; $('q').addEventListener('input',function(){ clearTimeout(tq); tq=setTimeout(dibujar,250); });
-  ['cta','vtr','glob'].forEach(function(id){ $(id).addEventListener('change',dibujar); });
+  ['cta','fte','vtr','glob'].forEach(function(id){ $(id).addEventListener('change',dibujar); });
   $('fBtn').addEventListener('click',function(){ var f=$('filtros'), a=!f.classList.contains('abierto'); f.classList.toggle('abierto',a); this.setAttribute('aria-expanded',a); });
 })();
 </script>
