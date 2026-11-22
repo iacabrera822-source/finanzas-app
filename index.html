@@ -377,6 +377,11 @@ section[hidden],article[hidden]{display:none!important}
 (function(){
   /* ---------- Conexión ---------- */
   var SRV='Google Sheets', TOOL='get_values';
+  var TG_ABIERTO=false, ENLACE=location.hash||'';      /* se guarda antes de que el panel reescriba la dirección */
+  if(/mov=/.test(ENLACE)){                              /* abierto desde Telegram: su SDK permite cerrar la ventana al guardar */
+    var tgs=document.createElement('script'); tgs.src='https://telegram.org/js/telegram-web-app.js';
+    tgs.onload=function(){ try{ Telegram.WebApp.ready(); Telegram.WebApp.expand(); }catch(e){} }; document.head.appendChild(tgs);
+  }
   /* Dónde corre: GAS = app servida por Apps Script; WEB = app instalada (GitHub Pages) que habla con el endpoint con token; si no, dentro de Claude. */
   var GAS=(typeof google!=='undefined' && google.script && google.script.run) ? google.script : null;
   var WEB=!GAS && (/\.github\.io$/.test(location.hostname) || window.__WEB===true);
@@ -486,6 +491,7 @@ section[hidden],article[hidden]{display:none!important}
       clave=(h[1]&&ks.indexOf(h[1])>=0)?h[1]:(ks.indexOf(KHOY)>=0?KHOY:(ks.filter(function(k){return k<=KHOY;})[0]||ks[0]));
       E.anc=clave;
       listo=true; $('cargando').hidden=true;
+      setTimeout(abrirDesdeEnlace,0);
     }
     $('avisos').dataset.extra=avisos||'';
     var np=ALL.filter(function(o){return o.pendEst||o.rev;}).length;
@@ -1964,7 +1970,17 @@ section[hidden],article[hidden]{display:none!important}
   function guardarMov(accion,datos,desc){
     return llamar('panel',{accion:accion,datos:datos}).then(function(r){
       ULT={mov:true, c:r&&r.cambio, desc:desc}; actualizar();
+      if(TG_ABIERTO && window.Telegram && Telegram.WebApp){ setTimeout(function(){ try{ Telegram.WebApp.close(); }catch(e){} },1500); }
     });
+  }
+  /* Enlace «#mov=ID» (botón «Abrir en la app» del bot de Telegram): abre el formulario de ese movimiento */
+  function abrirDesdeEnlace(){
+    var mm=/mov=([^&]+)/.exec(ENLACE); ENLACE=''; if(!mm) return;
+    var id=decodeURIComponent(mm[1]); TG_ABIERTO=!!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData);
+    var o=ALL.filter(function(x){ return x.m.id===id; })[0];
+    if(!o){ aviso('No encuentro ese movimiento en la planilla (puede que ya lo hayas borrado).'); return; }
+    if(!ESCRIBE){ ficha(o); return; }
+    abrirMov(o,'editar');
   }
   /* modo: 'nuevo' | 'editar' | 'copiar' */
   function abrirMov(o,modo){
