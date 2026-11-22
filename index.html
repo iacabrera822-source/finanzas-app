@@ -206,6 +206,12 @@ html.app .fab.on{display:block}
 .creal.big input{font-family:var(--font-num);font-size:24px;padding:10px 12px}
 .creal select{font-size:16px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
 .creal input.otra{margin-top:4px}
+.ptabs{display:flex;gap:6px;overflow-x:auto;margin:4px 0 10px;padding-bottom:2px;scrollbar-width:none}
+.ptabs::-webkit-scrollbar{display:none}
+.ptab{flex:none;border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:999px;padding:7px 14px;font:inherit;font-size:14px;cursor:pointer}
+.ptab[aria-selected=true]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+@media (prefers-color-scheme:dark){ .ptab[aria-selected=true]{color:#0b1416} }
+section[hidden],article[hidden]{display:none!important}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin:12px 0}
 .cdow{text-align:center;font-size:11.5px;color:var(--muted);padding:2px 0}
 .cday{min-height:52px;border:1px solid var(--line);border-radius:8px;background:var(--card);padding:3px 2px;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;color:var(--ink);font:inherit;overflow:hidden}
@@ -1438,7 +1444,32 @@ html.app .fab.on{display:block}
   function caja(host,titulo,ayuda){ var c=el('article','grp'), h=el('h3'); h.appendChild(el('span',null,titulo)); c.appendChild(h); if(ayuda) c.appendChild(el('div','ayuda',ayuda)); host.appendChild(c); return {c:c,h:h}; }
   function itemsMov(l){ return l.map(function(o){ return {t:o.nota||o.cat, s:o.cuenta+' · '+fechaCorta(o.fecha), n:o.monto, mov:o}; }); }
 
+  /* Presupuestos en pestañas: se arma todo y luego se muestra solo la pestaña elegida */
+  var PRE_TABS=[['res','Resumen'],['pre','Presupuestos'],['fij','Fijos'],['pla','Planeados'],['met','Metas']], preTab='res';
+  function tabDe(n){
+    if(n.classList.contains('hero')) return 'res';
+    var h=n.querySelector&&n.querySelector('h3>span'); if(!h) return null; var t=h.textContent;
+    if(/^Cuenta corriente|^Tarjeta/.test(t)) return 'res';
+    if(/^Presupuestos/.test(t)) return 'pre';
+    if(/^Lo que viene|^Fijos/.test(t)) return 'fij';
+    if(/^Gastos puntuales|^Por cobrar|^Postergados/.test(t)) return 'pla';
+    if(/^Metas/.test(t)) return 'met';
+    return null;
+  }
   function dPre(){
+    dPreTodo();
+    var host=$('preCont'), kids=Array.prototype.slice.call(host.children), hay={}, ancla=null;
+    kids.forEach(function(n){ var t=tabDe(n); n.dataset.tab=t||''; if(t) hay[t]=1; if(!ancla && t) ancla=n; });
+    if(!ancla) return;
+    if(!hay[preTab]) preTab=hay.res?'res':Object.keys(hay)[0];
+    var bar=el('div','ptabs'); bar.setAttribute('role','tablist');
+    PRE_TABS.forEach(function(x){ if(!hay[x[0]]) return; var b=el('button','ptab',x[1]); b.type='button'; b.setAttribute('role','tab'); b.setAttribute('aria-selected',preTab===x[0]);
+      b.addEventListener('click',function(){ preTab=x[0]; dibujar(); }); bar.appendChild(b); });
+    host.insertBefore(bar,ancla);
+    kids.forEach(function(n){ if(n.dataset.tab) n.hidden=n.dataset.tab!==preTab; });
+    var sel=bar.querySelector('[aria-selected=true]'); if(sel && sel.scrollIntoView) try{ bar.scrollLeft=sel.offsetLeft-16; }catch(e){}
+  }
+  function dPreTodo(){
     var host=$('preCont'); host.innerHTML='';
     if(!AUXD.Fijos && !AUXD.Plan){ host.appendChild(el('div','note','Todavía no puedo leer las hojas «Fijos» y «Plan». Revisa la conexión arriba.')); return; }
     if(!PM.mes) PM.mes=KHOY;
