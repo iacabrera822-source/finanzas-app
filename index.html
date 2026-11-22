@@ -2148,7 +2148,7 @@ section[hidden],article[hidden]{display:none!important}
       if(mal){ aviso(mal); return; }
       confirmarCambio('Dividir en '+partes.length+' partes', partes.map(function(p,i){ return (i+1)+'. '+pesos(Math.abs(p.monto))+' · '+p.categoria+(p.sub?' · '+p.sub:'')+(p.nota?' — '+p.nota:''); }).concat(['Total: '+pesos(Math.abs(total))+' (igual al cobro del banco)']),
         function(){ return guardarMov('dividir',{id:m.id,antes:m.raw,partes:partes},'división de '+(m.nota||titulo(o))); },
-        'Se divide igual que lo hace el bot (filas con el mismo ID y «compra dividida k/n»). Queda respaldo en «Cambios» y puedes deshacerlo.');
+        'Cada parte queda con su nota y, entre paréntesis, «(1/'+partes.length+' de '+pesos(Math.abs(total))+')», igual que cuando divides por Telegram. Queda respaldo en «Cambios» y puedes deshacerlo.');
     }]]);
     box.lastChild.lastChild.classList.add('pri');
   }
