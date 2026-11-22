@@ -980,8 +980,8 @@ section[hidden],article[hidden]{display:none!important}
   }
 
   /* ---------- Cuentas ---------- */
-  var GRUPOS=[['efectivo','Efectivo'],['cuenta','Cuentas'],['tarjeta','Tarjetas de crédito'],['inversion','Inversiones']];
-  var GMAP={'efectivo':'efectivo','cuentas':'cuenta','tarjetas de crédito':'tarjeta','tarjetas de credito':'tarjeta','inversiones':'inversion'};
+  var GRUPOS=[['efectivo','Efectivo'],['cuenta','Cuentas'],['tarjeta','Tarjetas de crédito'],['cobrar','Me deben'],['inversion','Inversiones']];
+  var GMAP={'efectivo':'efectivo','cuentas':'cuenta','tarjetas de crédito':'tarjeta','tarjetas de credito':'tarjeta','inversiones':'inversion','por cobrar':'cobrar'};
   /* Tabla de una hoja (encabezado + filas) -> lista de objetos por nombre de columna */
   function tablaObj(v){
     var h=(v[0]||[]).map(function(x){return String(x).trim();});
@@ -2011,6 +2011,9 @@ section[hidden],article[hidden]{display:none!important}
     if(!ed){ cuo=opciones(campo(box,'¿En cuotas?','select'),[['1','No, un solo pago']].concat([2,3,4,5,6,7,8,9,10,11,12,15,18,24,36,48].map(function(n){ return [String(n),n+' cuotas']; })),'1');
       cuo.parentNode.appendChild(el('span','ayudac','Se crea una fila por cuota: la primera en la fecha elegida y las demás un mes después cada una.')); }
     var dst=campo(box,'Hacia la cuenta','select');
+    var per=campo(box,'¿Quién? (persona que te debe o te pagó)','text',(m&&m.tipoRaw==='T')?m.sub:'','Nombre'); per.setAttribute('list','listaPer');
+    var dlp=document.createElement('datalist'); dlp.id='listaPer'; personas().forEach(function(p){ var op=document.createElement('option'); op.value=p; dlp.appendChild(op); }); box.appendChild(dlp);
+    function verPer(){ per.parentNode.hidden=!(T==='T' && (val(cta)===CTA_DEB || val(dst)===CTA_DEB)); }
     var cat=campo(box,'Categoría','select'), sub=campo(box,'Subcategoría','select');
     var tocado={cat:!!m, cta:!!m};
     var CAT={};
@@ -2024,6 +2027,7 @@ section[hidden],article[hidden]{display:none!important}
       dst.parentNode.hidden=!tr; cat.parentNode.hidden=tr; sub.parentNode.hidden=tr;
       if(tr) selConOtra(dst,cuentas,keep&&m&&m.tipoRaw==='T'?m.cat:'','(elige la cuenta)');
       else { CAT=catalogo(T); var cv=keep&&m&&m.tipoRaw===T?m.cat:''; selConOtra(cat,ordenar(CAT,function(x){return x.n;}),cv,'(elige la categoría)'); pintarSubs(keep&&m&&m.tipoRaw===T?m.sub:''); }
+      verPer();
     }
     function otra(sel,etq){
       var w=sel.parentNode, i=w.querySelector('input.otra');
@@ -2035,8 +2039,8 @@ section[hidden],article[hidden]{display:none!important}
     seg.addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return; T=b.dataset.t; pintarTipo(false); });
     cat.addEventListener('change',function(){ tocado.cat=true; otra(cat,'Nombre de la categoría nueva'); pintarSubs(''); otra(sub,''); });
     sub.addEventListener('change',function(){ otra(sub,'Nombre de la subcategoría nueva'); });
-    cta.addEventListener('change',function(){ tocado.cta=true; otra(cta,'Nombre de la cuenta'); });
-    dst.addEventListener('change',function(){ otra(dst,'Nombre de la cuenta'); });
+    cta.addEventListener('change',function(){ tocado.cta=true; otra(cta,'Nombre de la cuenta'); verPer(); });
+    dst.addEventListener('change',function(){ otra(dst,'Nombre de la cuenta'); verPer(); });
     function aplicar(p,avisar){
       if(ed) return;
       if(p.m.tipoRaw!==T){ T=p.m.tipoRaw; pintarTipo(false); }
@@ -2084,13 +2088,14 @@ section[hidden],article[hidden]{display:none!important}
       if(T!=='T' && !vCat){ aviso('Elige la categoría.'); return; }
       var v=ed?filaMov(m.raw):filaMov([]);
       var clp=extranjera?(m.clp==null?'':String(m.clp)):String(reemb.checked?-monto:monto);
-      v[0]=fec.value; v[1]=vCta; v[2]=T==='T'?vDst:vCat; v[3]=T==='T'?'':vSub; v[4]=nota.value.trim();
+      v[0]=fec.value; v[1]=vCta; v[2]=T==='T'?vDst:vCat; v[3]=T==='T'?((vCta===CTA_DEB||vDst===CTA_DEB)?per.value.trim():''):vSub;
+      if(T==='T' && (vCta===CTA_DEB||vDst===CTA_DEB) && !v[3]){ aviso('Escribe quién te debe o quién te pagó.'); per.focus(); return; } v[4]=nota.value.trim();
       v[5]=clp; v[6]=T==='G'?'Gasto':T==='I'?'Ingreso':'Dinero gastado';
       if(!extranjera && (!ed || num(m.raw[5])!==+clp)){ v[8]=clp; v[9]='CLP'; v[15]=''; }
       if(!ed){ v[7]=(modo==='copiar'&&m.desc)?m.desc:''; v[10]=''; v[11]=''; v[13]=''; v[14]=''; }
       v[12]=''; v[16]='Confirmado'; if(ed) v[11]='';
       var desc=(T==='T'?'Traspaso '+v[1]+' → '+v[2]:v[2]+(v[3]?' · '+v[3]:''))+' '+pesos(+clp||0);
-      var lin=[(T==='G'?'Gasto':T==='I'?'Ingreso':'Traspaso')+': '+(extranjera?enMon(m.importe||0,m.moneda):pesos(+clp)), fechaCorta(v[0])+' · '+v[1]+(T==='T'?' → '+v[2]:''), T==='T'?'':('Categoría: '+v[2]+(v[3]?' · '+v[3]:'')), 'Nota: '+(v[4]||'(sin nota)')].filter(Boolean);
+      var lin=[(T==='G'?'Gasto':T==='I'?'Ingreso':'Traspaso')+': '+(extranjera?enMon(m.importe||0,m.moneda):pesos(+clp)), fechaCorta(v[0])+' · '+v[1]+(T==='T'?' → '+v[2]:''), T==='T'?(v[3]?'Persona: '+v[3]:''):('Categoría: '+v[2]+(v[3]?' · '+v[3]:'')), 'Nota: '+(v[4]||'(sin nota)')].filter(Boolean);
       if(ed){
         var dif=[]; COLS.forEach(function(c,i){ if(c==='Mes'||c==='Estado'||c==='Revisar') return; var a=String(m.raw[i]||''), b=String(v[i]||''); if(i===5||i===8){ a=String(num(a)); b=String(num(b)); } if(i===0) a=fecha(a)||a; if(a!==b) dif.push(c+': «'+(m.raw[i]||'—')+'» → «'+(v[i]||'—')+'»'); });
         if(!dif.length && !o.pendEst && !o.rev){ aviso('No cambiaste nada.'); return; }
@@ -2121,8 +2126,8 @@ section[hidden],article[hidden]{display:none!important}
     var lista=el('div','partes'); box.appendChild(lista);
     var falta=el('div','falta'); box.appendChild(falta);
     var add=el('button','btn','+ Agregar parte'); add.type='button'; add.style.cssText='width:100%;margin:6px 0 4px'; box.appendChild(add);
-    var CQD=cats.filter(function(c){ return /quedan debiendo/i.test(c); })[0]||'';
-    var otros=null; if(T==='G' && CQD){ otros=el('button','btn','+ Parte que pagué por otros (me la deben)'); otros.type='button'; otros.style.cssText='width:100%;margin:0 0 4px'; box.appendChild(otros); }
+    var CQD=CTA_DEB; CAT[CTA_DEB]={n:0,subs:{}}; personas().forEach(function(p,i){ CAT[CTA_DEB].subs[p]=1000-i; });
+    var otros=null; if(T==='G' && signo>0){ otros=el('button','btn','+ Parte que pagué por otros (va a «Me deben»)'); otros.type='button'; otros.style.cssText='width:100%;margin:0 0 4px'; box.appendChild(otros); }
     var P=[];
     function sumaOtras(x){ return P.reduce(function(a,q){ return q===x?a:a+(+(q.mon.value.replace(/[^\d]/g,''))||0); },0); }
     function actualizar(){
@@ -2154,7 +2159,7 @@ section[hidden],article[hidden]{display:none!important}
     if(otros) otros.addEventListener('click',function(){
       var vacia=P.filter(function(q){ return !q.cat.value && !q.mon.value; })[0], q=vacia||parte('','','',null);
       selConOtra(q.cat,cats,CQD,'(elige la categoría)'); q.cat.dispatchEvent(new Event('change'));
-      q.nota.value=q.nota.value||'Pagué por otros: '; actualizar(); q.mon.focus(); });
+      q.sub.parentNode.firstChild.textContent='¿Quién te debe esta parte?'; actualizar(); q.mon.focus(); });
     add.addEventListener('click',function(){ var q=parte('','','',null); var r=Math.abs(total)-sumaOtras(q); if(r>0){ q.mon.value=fmt.format(r); } actualizar(); q.cat.focus(); });
     actualizar();
     botones(box,[['Cancelar',cerrarFicha],['Revisar división',function(){
@@ -2177,37 +2182,43 @@ section[hidden],article[hidden]{display:none!important}
   }
   $('fab').addEventListener('click',function(){ abrirMov(null,'nuevo'); });
 
-  /* ---------- Me quedan debiendo ---------- */
-  var DEB_MESES=3;
+  /* ---------- Me deben: cuenta virtual «Me deben» (traspasos con la persona en Subcategorías) ---------- */
+  var CTA_DEB='Me deben';
+  function personas(){
+    var P={}, desde=sumarMeses(KHOY,-12);
+    ALL.forEach(function(o){ var m=o.m; if(!m.sub) return;
+      if((m.tipoRaw==='T' && (m.cat===CTA_DEB || m.cuenta===CTA_DEB)) || (/quedan debiendo/i.test(m.cat) && o.k>=desde && !/[^\wáéíóúñÁÉÍÓÚÑ .'-]/.test(m.sub))) P[m.sub]=Math.max(P[m.sub]||'',o.fecha); });
+    return Object.keys(P).sort(function(a,b){ return P[b]<P[a]?-1:1; });
+  }
   function deudores(){
-    var cq=null, P={}, desde=sumarMeses(KHOY,-(DEB_MESES-1)), pag=0, dev=0;
-    ALL.forEach(function(o){ if(o.m.tipoRaw!=='G' || !/quedan debiendo/i.test(o.m.cat) || o.pend || o.fecha>FHOY) return; cq=o.m.cat; if(o.k<desde) return;
-      if(o.monto>0) pag+=o.monto; else dev+=-o.monto;
-      var k=o.m.sub||'(sin nombre)', x=P[k]=P[k]||{n:k,s:0,l:[]}; x.s+=o.monto; x.l.push(o); });
-    return {cat:cq, desde:desde, pag:pag, dev:dev, lista:Object.keys(P).map(function(k){ return P[k]; }).sort(function(a,b){ return b.s-a.s; })};
+    var P={}, tot=0, hay=SAL.some(function(a){ return a.n===CTA_DEB; });
+    ALL.forEach(function(o){ var m=o.m; if(m.tipoRaw!=='T' || o.pend || o.fecha>FHOY) return;
+      var v=m.cat===CTA_DEB?o.monto:(m.cuenta===CTA_DEB?-o.monto:0); if(!v) return;
+      var k=m.sub||'(sin nombre)', x=P[k]=P[k]||{n:k,s:0,l:[]}; x.s+=v; x.l.push({o:o,v:v}); tot+=v; });
+    return {hay:hay||Object.keys(P).length>0, tot:tot, lista:Object.keys(P).map(function(k){ return P[k]; }).filter(function(x){ return Math.round(x.s)!==0 || x.l.length; }).sort(function(a,b){ return b.s-a.s; })};
   }
   function dDeben(){
-    var host=$('penDeben'); host.innerHTML=''; var D=deudores(); if(!D.cat) return;
-    var c=caja(host,'Me quedan debiendo','Desde '+nombre(D.desde)+' (últimos '+DEB_MESES+' meses), agrupado por la subcategoría que usaste. Toca una para ver el detalle'+(ESCRIBE?' o registrar un pago.':'.'));
-    var sel=el('div','seg'); sel.style.margin='0 0 8px'; [[3,'3 meses'],[6,'6 meses'],[12,'12 meses']].forEach(function(x){ var b=el('button',null,x[1]); b.setAttribute('aria-pressed',DEB_MESES===x[0]); b.addEventListener('click',function(){ DEB_MESES=x[0]; dDeben(); }); sel.appendChild(b); }); c.c.appendChild(sel);
-    linea(c.c,'Pagaste por otros',D.pag,''); linea(c.c,'Te devolvieron',D.dev,'i','','-');
-    var tot=0;
-    D.lista.forEach(function(x){ tot+=x.s;
-      var r=filaLinea(x.n,x.s,x.s>0?'':'i',x.s>0?'te debe':'a su favor',x.s>0?'':'+'); r.classList.add('rowc'); r.tabIndex=0; r.setAttribute('role','button');
-      r.addEventListener('click',function(){ abrirDeudor(x,D.cat); }); c.c.appendChild(r); });
-    var lt=linea(c.c,tot>=0?'Te deben en total':'Te devolvieron de más',tot,''); lt.style.fontWeight='600';
-    if(ESCRIBE){ var bg=el('button','btn','Registrar pago recibido'); bg.style.cssText='width:100%;margin-top:8px'; bg.addEventListener('click',function(){ abrirDeudor({n:'',s:0,l:[]},D.cat,true); }); c.c.appendChild(bg); }
+    var host=$('penDeben'); host.innerHTML=''; var D=deudores(); if(!D.hay) return;
+    var c=caja(host,'Me deben','Lo que pagaste por otros queda en la cuenta «Me deben» (no cuenta como gasto); cuando te pagan, sale de ahí. Toca una persona para ver el detalle'+(ESCRIBE?' o registrar un pago.':'.'));
+    if(!D.lista.length) c.c.appendChild(el('div','pl dim','Nadie te debe nada por ahora.'));
+    D.lista.forEach(function(x){
+      var r=filaLinea(x.n,x.s,x.s>0?'':'i',Math.round(x.s)===0?'al día':x.s>0?'te debe':'le debes tú',x.s<0?'-':''); r.classList.add('rowc'); r.tabIndex=0; r.setAttribute('role','button');
+      r.addEventListener('click',function(){ abrirDeudor(x); }); c.c.appendChild(r); });
+    var lt=linea(c.c,'Te deben en total',D.tot,''); lt.style.fontWeight='600';
+    if(ESCRIBE){ var bg=el('button','btn','Registrar pago recibido'); bg.style.cssText='width:100%;margin-top:8px'; bg.addEventListener('click',function(){ pagoRecibido('',null); }); c.c.appendChild(bg); }
+    if(ALL.some(function(o){ return /quedan debiendo/i.test(o.m.cat) && o.k>=sumarMeses(KHOY,-2); }))
+      c.c.appendChild(el('div','ayuda','Los movimientos antiguos en «😡 Me quedan debiendo» quedan como estaban (siguen en Estadísticas).'));
   }
-  function abrirDeudor(x,cat,directo){
-    if(directo){ abrirMov({reemb:true, titulo:'Pago recibido', ayuda:'Queda como gasto negativo en «'+cat+'». Elige la subcategoría (persona) si corresponde.', m:{tipoRaw:'G', cuenta:'Linea de crédito BCI', cat:cat, sub:'', nota:'', clp:null, moneda:'CLP', desc:''}},'prefill'); return; }
-    var box=hojaBase(x.n,(x.s>0?'Te debe '+pesos(x.s):'Saldo a su favor '+pesos(-x.s))+' · últimos '+DEB_MESES+' meses');
+  function pagoRecibido(persona,monto){
+    abrirMov({titulo:persona?'Pago recibido de '+persona:'Pago recibido', ayuda:'Es un traspaso desde «'+CTA_DEB+'» a la cuenta donde llegó la plata: baja lo que te deben y no cuenta como ingreso.',
+      m:{tipoRaw:'T', cuenta:CTA_DEB, cat:'Linea de crédito BCI', sub:persona, nota:persona?'Pago de '+persona:'', clp:monto, moneda:'CLP', desc:''}},'prefill');
+  }
+  function abrirDeudor(x){
+    var box=hojaBase(x.n,Math.round(x.s)===0?'Al día':x.s>0?'Te debe '+pesos(x.s):'Le debes '+pesos(-x.s));
     if(ESCRIBE && x.s>0){ var b=el('button','btn pri','Registrar pago recibido'); b.style.cssText='width:100%;margin:8px 0;padding:10px';
-      b.addEventListener('click',function(){ abrirMov({titulo:'Pago recibido de '+x.n, ayuda:'Queda como gasto negativo en «'+cat+'» (así baja lo que te debe). Ajusta el monto si te pagó solo una parte.',
-        m:{tipoRaw:'G', cuenta:'Linea de crédito BCI', cat:cat, sub:x.n==='(sin nombre)'?'':x.n, nota:'Pago de '+x.n, clp:-Math.round(x.s), moneda:'CLP', desc:''}},'prefill'); });
-      box.appendChild(b); }
-    var l=el('div','lcard'); x.l.slice(0,40).forEach(function(o){ var r=filaLinea(o.nota||'(sin nota)',o.monto,o.monto<0?'i':'',fechaCorta(o.fecha)+' · '+o.cuenta+(o.monto<0?' · te pagó':' · pagaste tú'),o.monto<0?'+':''); l.appendChild(r); });
+      b.addEventListener('click',function(){ pagoRecibido(x.n==='(sin nombre)'?'':x.n,Math.round(x.s)); }); box.appendChild(b); }
+    var l=el('div','lcard'); x.l.slice().reverse().slice(0,40).forEach(function(y){ var o=y.o; var r=filaLinea(o.nota||'(sin nota)',y.v,y.v<0?'i':'',fechaCorta(o.fecha)+' · '+(y.v>0?'pagaste tú desde '+o.cuenta:'te pagó a '+o.m.cat),y.v<0?'-':'+'); l.appendChild(r); });
     box.appendChild(l);
-    if(x.l.length>40) box.appendChild(el('div','pie2','Muestro los 40 más recientes de '+x.l.length+'.'));
   }
   /* ---------- Historial de cambios (hoja «Cambios») ---------- */
   var HIST=null;
